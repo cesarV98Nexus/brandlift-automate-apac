@@ -13,6 +13,7 @@ use App\Services\LiquidId;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -53,6 +54,9 @@ class BrandliftController extends Controller
      */
     public function submitResponse(Request $request): JsonResponse
     {
+        $dedupKey = null;
+        $dedupStore = null;
+
         try {
             $sheetId = $request->input('sheetId');
 
@@ -61,7 +65,35 @@ class BrandliftController extends Controller
             }
 
             // Extract core data from the request
-            $userId = $request->input('userId', '');
+            $userId = trim((string) $request->input('userId', ''));
+
+            if ($userId !== '') {
+                $dedupKey = 'bl_resp_dedup:'.md5($sheetId.'|'.$userId);
+                $acquired = true;
+
+                try {
+                    $acquired = Cache::add($dedupKey, 1, now()->addMinutes(15));
+                    $dedupStore = 'default';
+                } catch (\Throwable $cacheErr) {
+                    try {
+                        $acquired = Cache::store('file')->add($dedupKey, 1, now()->addMinutes(15));
+                        $dedupStore = 'file';
+                    } catch (\Throwable $fileCacheErr) {
+                        Log::warning('Brandlift deduplication cache unavailable', [
+                            'error' => $fileCacheErr->getMessage(),
+                        ]);
+                        $acquired = true;
+                    }
+                }
+
+                if (! $acquired) {
+                    return response()->json(['success' => true, 'deduplicated' => true])
+                        ->header('Access-Control-Allow-Origin', '*')
+                        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                        ->header('Access-Control-Allow-Headers', 'Content-Type');
+                }
+            }
+
             $campaign = $request->input('campaign', '');
             $market = $request->input('market', '');
             $rawGroup = trim((string) $request->input('group', ''));
@@ -115,11 +147,35 @@ class BrandliftController extends Controller
                     ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
                     ->header('Access-Control-Allow-Headers', 'Content-Type');
             } else {
+                if ($dedupKey && $dedupStore) {
+                    try {
+                        if ($dedupStore === 'file') {
+                            Cache::store('file')->forget($dedupKey);
+                        } else {
+                            Cache::forget($dedupKey);
+                        }
+                    } catch (\Throwable $forgetErr) {
+                        // Ignore cache cleanup errors
+                    }
+                }
+
                 return response()->json(['error' => 'Failed to write to sheet: '.$success], 500)
                     ->header('Access-Control-Allow-Origin', '*');
             }
 
         } catch (\Exception $e) {
+            if ($dedupKey && $dedupStore) {
+                try {
+                    if ($dedupStore === 'file') {
+                        Cache::store('file')->forget($dedupKey);
+                    } else {
+                        Cache::forget($dedupKey);
+                    }
+                } catch (\Throwable $forgetErr) {
+                    // Ignore cache cleanup errors
+                }
+            }
+
             Log::error('API Response Submit Error', [
                 'error' => $e->getMessage(),
             ]);

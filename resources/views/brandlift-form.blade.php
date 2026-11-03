@@ -4045,6 +4045,9 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
     function generateCreativeHTML(questionsData, w, h, sheetId, campaign, market, groupName, tagType, clickUrl, theme = 'dark') {
         const isDark = theme === 'dark';
         const resolvedGroupLabel = formatCreativeGroupLabel(groupName, tagType);
+        const resolvedWebhookUrl = sheetId
+            ? `https://phpstack-404581-6369702.cloudwaysapps.com/api/brandlift/submit?sheetId=${sheetId}`
+            : '';
 
         const bgStyle = isDark
             ? 'background:linear-gradient(160deg,#0a1628 0%,#0d2b5e 35%,#1a4a8a 50%,#0d2b5e 65%,#0a1628 100%);'
@@ -4076,8 +4079,11 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
 </style>
 <script>
  ${clickUrl ? `var clickTag = "${clickUrl}";` : ''}
- var webhookUrl = "https://phpstack-404581-6369702.cloudwaysapps.com/api/brandlift/submit?sheetId=${sheetId}";
+ var webhookUrl = "${resolvedWebhookUrl}";
  var surveyData = {};
+ var sessionUserId = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+ var answeredQuestions = {};
+ var answersSubmitted = false;
 
  function fitQuestionTexts() {
    var qTexts = document.querySelectorAll('.question-text');
@@ -4127,13 +4133,31 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
    surveyData['market'] = "${market}";
    surveyData['group'] = "${resolvedGroupLabel}";
    surveyData['tagType'] = "${tagType}";
-   surveyData['userId'] = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+   surveyData['userId'] = sessionUserId;
+ }
+
+ function selectAnswer(el, qNum, qText, aText, nextScreen, isLast) {
+   if (answeredQuestions[qNum] || answersSubmitted) return;
+   answeredQuestions[qNum] = true;
+   if (el && el.parentElement) {
+     el.parentElement.style.pointerEvents = 'none';
+   }
+   storeAnswer(qNum, qText, aText);
+   if (isLast) {
+     submitAnswers();
+   }
+   setTimeout(function() {
+     showScreen(nextScreen);
+   }, 300);
  }
 
  function submitAnswers() {
+   if (answersSubmitted) return;
+   answersSubmitted = true;
    if (webhookUrl && webhookUrl.trim() !== "") {
      fetch(webhookUrl, {
        method: 'POST',
+       keepalive: true,
        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
        body: new URLSearchParams(surveyData).toString()
      }).catch(function(e) { console.error(e); });
@@ -4223,7 +4247,7 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
 
             q.answers.forEach(a => {
                 html += `
-   <div onclick="storeAnswer('${qNum}', '${q.question.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', '${a.replace(/'/g,"\\'").replace(/"/g,"&quot;")}'); setTimeout(function(){ showScreen('${nextScreen}'); ${qNum === questionsData.length ? 'submitAnswers();' : ''} }, 300);" class="btn-anim" style="background:${btnBg};border-radius:100px;padding:${btnPadding};text-align:center;cursor:pointer;font-family:Arial,Helvetica,sans-serif;font-size:${btnFontSize}px;font-weight:700;color:${btnText};letter-spacing:0.3px;width:80%;max-width:${btnMaxWidth}px;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,0.15);">${a}</div>`;
+   <div onclick="selectAnswer(this, '${qNum}', '${q.question.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', '${a.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', '${nextScreen}', ${qNum === questionsData.length});" class="btn-anim" style="background:${btnBg};border-radius:100px;padding:${btnPadding};text-align:center;cursor:pointer;font-family:Arial,Helvetica,sans-serif;font-size:${btnFontSize}px;font-weight:700;color:${btnText};letter-spacing:0.3px;width:80%;max-width:${btnMaxWidth}px;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,0.15);">${a}</div>`;
             });
 
             html += `

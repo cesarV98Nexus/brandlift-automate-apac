@@ -3665,6 +3665,9 @@ function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, 
 <script>
  var webhookUrl = "${resolvedWebhookUrl}"; 
  var surveyData = {};
+ var sessionUserId = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+ var answeredQuestions = {};
+ var answersSubmitted = false;
 
  function fitQuestionTexts() {
    var qTexts = document.querySelectorAll('.question-text');
@@ -3714,13 +3717,31 @@ function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, 
    surveyData['market'] = "${market}";
    surveyData['group'] = "${resolvedGroupLabel}";
    surveyData['tagType'] = "${tagType}";
-   surveyData['userId'] = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+   surveyData['userId'] = sessionUserId;
+ }
+
+ function selectAnswer(el, qNum, qText, aText, nextScreen, isLast) {
+   if (answeredQuestions[qNum] || answersSubmitted) return;
+   answeredQuestions[qNum] = true;
+   if (el && el.parentElement) {
+     el.parentElement.style.pointerEvents = 'none';
+   }
+   storeAnswer(qNum, qText, aText);
+   if (isLast) {
+     submitAnswers();
+   }
+   setTimeout(function() {
+     showScreen(nextScreen);
+   }, 300);
  }
 
  function submitAnswers() {
+   if (answersSubmitted) return;
+   answersSubmitted = true;
    if (webhookUrl && webhookUrl.trim() !== "") {
      fetch(webhookUrl, {
        method: 'POST',
+       keepalive: true,
        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
        body: new URLSearchParams(surveyData).toString()
      }).catch(function(e) { console.error(e); });
@@ -3809,7 +3830,7 @@ function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, 
 
         q.answers.forEach(a => {
             html += `
-   <div onclick="storeAnswer('${qNum}', '${q.question}', '${a}'); setTimeout(function(){ showScreen('${nextScreen}'); ${nextScreen === 'screen-thanks' ? 'submitAnswers();' : ''} }, 300);" class="btn-anim" style="background:${btnBg};border-radius:100px;padding:${btnPadding};text-align:center;cursor:pointer;font-family:Arial,Helvetica,sans-serif;font-size:${btnFontSize}px;font-weight:700;color:${theme==='dark'?'#000050':'#ffffff'};letter-spacing:0.3px;width:80%;max-width:${btnMaxWidth}px;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,0.15);">${a}</div>`;
+   <div onclick="selectAnswer(this, '${qNum}', '${(q.question || '').replace(/'/g,"\\'").replace(/"/g,"&quot;")}', '${(a || '').replace(/'/g,"\\'").replace(/"/g,"&quot;")}', '${nextScreen}', ${nextScreen === 'screen-thanks'});" class="btn-anim" style="background:${btnBg};border-radius:100px;padding:${btnPadding};text-align:center;cursor:pointer;font-family:Arial,Helvetica,sans-serif;font-size:${btnFontSize}px;font-weight:700;color:${theme==='dark'?'#000050':'#ffffff'};letter-spacing:0.3px;width:80%;max-width:${btnMaxWidth}px;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,0.15);">${a}</div>`;
         });
 
         html += `
