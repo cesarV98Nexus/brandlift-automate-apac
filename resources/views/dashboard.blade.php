@@ -3616,8 +3616,26 @@ function removeEditQuestion(idx) {
 }
 
 // Generate creative HTML (copied and adapted from brandlift-form)
-function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, tagType, theme = 'dark') {
+function formatDashboardGroupLabel(groupName, tagType) {
+    const cleanGroup = String(groupName || '').trim();
+    const cleanTag = String(tagType || '').trim();
+    if (cleanGroup && cleanTag) {
+        const lowerGroup = cleanGroup.toLowerCase();
+        const lowerTag = cleanTag.toLowerCase();
+        if (lowerGroup === lowerTag || lowerGroup.endsWith('_' + lowerTag)) {
+            return cleanGroup;
+        }
+        return `${cleanGroup}_${cleanTag}`;
+    }
+    return cleanGroup || cleanTag || '';
+}
+
+function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, tagType, theme = 'dark', sheetId = '') {
     const isDark = theme === 'dark';
+    const resolvedGroupLabel = formatDashboardGroupLabel(groupName, tagType);
+    const resolvedWebhookUrl = sheetId
+        ? `https://phpstack-404581-6369702.cloudwaysapps.com/api/brandlift/submit?sheetId=${sheetId}`
+        : '';
     const bgStyle = isDark
         ? 'background:linear-gradient(160deg,#0a1628 0%,#0d2b5e 35%,#1a4a8a 50%,#0d2b5e 65%,#0a1628 100%);'
         : 'background:linear-gradient(160deg,#f8fafc 0%,#e2e8f0 35%,#cbd5e1 50%,#e2e8f0 65%,#f8fafc 100%);';
@@ -3645,7 +3663,7 @@ function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, 
  .btn-anim:active { transform: scale(0.96); }
 </style>
 <script>
- var webhookUrl = ""; 
+ var webhookUrl = "${resolvedWebhookUrl}"; 
  var surveyData = {};
 
  function fitQuestionTexts() {
@@ -3694,7 +3712,7 @@ function generateCreativeHTML(questionsData, w, h, campaign, market, groupName, 
    surveyData['a' + qNum] = aText;
    surveyData['campaign'] = "${campaign}";
    surveyData['market'] = "${market}";
-   surveyData['group'] = "${groupName}";
+   surveyData['group'] = "${resolvedGroupLabel}";
    surveyData['tagType'] = "${tagType}";
    surveyData['userId'] = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
  }
@@ -3840,12 +3858,25 @@ async function saveEditedQuestions() {
     // Generate new HTML for each creative
     const updatedCreatives = [];
     editingStudy.creatives.forEach(c => {
-        // Extract groupName and tagType from existing HTML if possible
+        // Extract groupName and tagType from existing HTML or variant_key if possible
         const oldHtml = c.creative_html || '';
         const groupMatch = oldHtml.match(/surveyData\['group'\]\s*=\s*"([^"]*)"/);
         const tagTypeMatch = oldHtml.match(/surveyData\['tagType'\]\s*=\s*"([^"]*)"/);
-        const groupName = groupMatch ? groupMatch[1] : '';
-        const tagType = tagTypeMatch ? tagTypeMatch[1] : 'Ad_Exposed';
+        let groupName = groupMatch ? groupMatch[1] : '';
+        let tagType = tagTypeMatch ? tagTypeMatch[1] : '';
+
+        if (!tagType && c.variant_key) {
+            if (/control$/i.test(c.variant_key)) tagType = 'Control';
+            else if (/ad_?exposed$/i.test(c.variant_key)) tagType = 'Ad_Exposed';
+        }
+        if (!tagType) tagType = 'Ad_Exposed';
+
+        if (!groupName && c.variant_key) {
+            const parts = String(c.variant_key).replace(/_(Ad_Exposed|Control)$/i, '').split('_');
+            if (parts.length > 1) {
+                groupName = parts.slice(1).join('_');
+            }
+        }
 
         // Assuming question_number is always 1 for the whole creative bundle (as generated initially)
         const newHtml = generateCreativeHTML(
@@ -3856,7 +3887,8 @@ async function saveEditedQuestions() {
             editingStudy.market,
             groupName,
             tagType,
-            theme
+            theme,
+            editingStudy.sheet_id || ''
         );
 
         updatedCreatives.push({

@@ -64,7 +64,24 @@ class BrandliftController extends Controller
             $userId = $request->input('userId', '');
             $campaign = $request->input('campaign', '');
             $market = $request->input('market', '');
-            $group = $request->input('group', '');
+            $rawGroup = trim((string) $request->input('group', ''));
+            $tagType = trim((string) $request->input('tagType', ''));
+
+            if ($rawGroup !== '' && $tagType !== '') {
+                if (
+                    strcasecmp($rawGroup, $tagType) === 0
+                    || str_ends_with(strtolower($rawGroup), '_'.strtolower($tagType))
+                ) {
+                    $group = $rawGroup;
+                } else {
+                    $group = "{$rawGroup}_{$tagType}";
+                }
+            } elseif ($rawGroup !== '') {
+                $group = $rawGroup;
+            } else {
+                $group = $tagType;
+            }
+
             $date = now()->format('Y-m-d H:i:s');
 
             // Start row values with Id (userId)

@@ -4028,8 +4028,23 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
     validateCurrentStep();
 
     // ===== GENERATE CREATIVE HTML =====
+    function formatCreativeGroupLabel(groupName, tagType) {
+        const cleanGroup = String(groupName || '').trim();
+        const cleanTag = String(tagType || '').trim();
+        if (cleanGroup && cleanTag) {
+            const lowerGroup = cleanGroup.toLowerCase();
+            const lowerTag = cleanTag.toLowerCase();
+            if (lowerGroup === lowerTag || lowerGroup.endsWith('_' + lowerTag)) {
+                return cleanGroup;
+            }
+            return `${cleanGroup}_${cleanTag}`;
+        }
+        return cleanGroup || cleanTag || '';
+    }
+
     function generateCreativeHTML(questionsData, w, h, sheetId, campaign, market, groupName, tagType, clickUrl, theme = 'dark') {
         const isDark = theme === 'dark';
+        const resolvedGroupLabel = formatCreativeGroupLabel(groupName, tagType);
 
         const bgStyle = isDark
             ? 'background:linear-gradient(160deg,#0a1628 0%,#0d2b5e 35%,#1a4a8a 50%,#0d2b5e 65%,#0a1628 100%);'
@@ -4110,7 +4125,7 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
    surveyData['a' + qNum] = aText;
    surveyData['campaign'] = "${campaign}";
    surveyData['market'] = "${market}";
-   surveyData['group'] = "${groupName}";
+   surveyData['group'] = "${resolvedGroupLabel}";
    surveyData['tagType'] = "${tagType}";
    surveyData['userId'] = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
  }
@@ -4400,6 +4415,8 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
 
             setAIStep(1, 'active', 'Registrando estudio y preguntas en la base de datos...');
             updateAIProgress(22);
+
+            generateAndShowPreviews(sheetId);
 
             const questionsPayload = [];
             for (let i = 0; i < state.questionCount; i++) {
@@ -5694,7 +5711,7 @@ Por favor verificar la correcta implementación antes del inicio de la pauta.</t
         const market = $('#bl-market-step1').value;
         const campaignNameStep1 = $('#bl-campaign-name-step1').value.trim();
         const sheetOption = document.querySelector('input[name="sheet-option"]:checked')?.value || 'manual';
-        const sheetId = sheetOption === 'manual' ? ($('#bl-sheet-id')?.value?.trim() || '') : (state.studyId || '');
+        const sheetId = sheetOption === 'manual' ? ($('#bl-sheet-id')?.value?.trim() || '') : (window.EDIT_STUDY_DATA?.sheet_id || '');
 
         state.generatedCreatives.forEach(variant => {
             const isClickEvent = ['TTD', 'Sonata', 'Amazon'].includes(variant.dps);
