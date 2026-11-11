@@ -18,22 +18,22 @@ class DatabaseSeeder extends Seeder
     {
         $admins = [
             [
-                'name' => 'Camilo Serrato',
-                'email' => 'camilo.serrato@wppmedia.com',
+                'name' => 'César Velandia',
+                'email' => 'cesar.velandia@wppmedia.com',
                 'role' => 'admin',
                 'status' => 'active',
                 'markets' => null,
             ],
             [
-                'name' => 'Sandra Gordillo',
-                'email' => 'sandra.gordillo@wppmedia.com',
+                'name' => 'Rubén Torres',
+                'email' => 'ruben.torres@wppmedia.com',
                 'role' => 'admin',
                 'status' => 'active',
                 'markets' => null,
             ],
             [
-                'name' => 'Juan Rodriguez',
-                'email' => 'juan.rodriguezv@wppmedia.com',
+                'name' => 'John Penagos',
+                'email' => 'john.penagos@wppmedia.com',
                 'role' => 'admin',
                 'status' => 'active',
                 'markets' => null,
@@ -41,7 +41,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($admins as $adminData) {
-            User::updateOrCreate(
+            User::firstOrCreate(
                 ['email' => $adminData['email']],
                 [
                     'name' => $adminData['name'],

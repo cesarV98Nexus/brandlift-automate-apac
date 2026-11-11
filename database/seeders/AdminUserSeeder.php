@@ -9,13 +9,30 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::updateOrCreate(
-            ['email' => 'juan.rodriguezv@wppmedia.com'],
+        $admins = [
             [
-                'name' => 'Admin',
-                'role' => 'admin',
-                'password' => null,
-            ]
-        );
+                'name' => 'César Velandia',
+                'email' => 'cesar.velandia@wppmedia.com',
+            ],
+            [
+                'name' => 'Rubén Torres',
+                'email' => 'ruben.torres@wppmedia.com',
+            ],
+            [
+                'name' => 'John Penagos',
+                'email' => 'john.penagos@wppmedia.com',
+            ],
+        ];
+
+        foreach ($admins as $adminData) {
+            User::updateOrCreate(
+                ['email' => $adminData['email']],
+                [
+                    'name' => $adminData['name'],
+                    'role' => 'admin',
+                    'password' => null,
+                ]
+            );
+        }
     }
 }
